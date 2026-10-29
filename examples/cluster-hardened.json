@@ -1,0 +1,952 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "items": [
+    {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "ci",
+        "labels": {
+          "pod-security.kubernetes.io/enforce": "restricted"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "platform",
+        "labels": {
+          "pod-security.kubernetes.io/enforce": "restricted"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "observability",
+        "labels": {
+          "pod-security.kubernetes.io/enforce": "restricted"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "legacy",
+        "labels": {
+          "pod-security.kubernetes.io/enforce": "baseline"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "kube-system",
+        "labels": {
+          "pod-security.kubernetes.io/enforce": "privileged"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Node",
+      "metadata": {
+        "name": "cp-1",
+        "labels": {
+          "node-role.kubernetes.io/control-plane": "",
+          "kubernetes.io/hostname": "cp-1"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Node",
+      "metadata": {
+        "name": "worker-1",
+        "labels": {
+          "kubernetes.io/hostname": "worker-1",
+          "disktype": "hdd"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Node",
+      "metadata": {
+        "name": "worker-2",
+        "labels": {
+          "kubernetes.io/hostname": "worker-2",
+          "disktype": "ssd"
+        }
+      }
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+        "name": "cluster-admin",
+        "labels": {
+          "kubernetes.io/bootstrapping": "rbac-defaults"
+        }
+      },
+      "rules": [
+        {
+          "verbs": [
+            "*"
+          ],
+          "apiGroups": [
+            "*"
+          ],
+          "resources": [
+            "*"
+          ]
+        },
+        {
+          "verbs": [
+            "*"
+          ],
+          "nonResourceURLs": [
+            "*"
+          ]
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+        "name": "workload-viewer"
+      },
+      "rules": [
+        {
+          "verbs": [
+            "get",
+            "list",
+            "watch"
+          ],
+          "apiGroups": [
+            "apps"
+          ],
+          "resources": [
+            "deployments",
+            "statefulsets",
+            "replicasets"
+          ]
+        },
+        {
+          "verbs": [
+            "get",
+            "list",
+            "watch"
+          ],
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "pods",
+            "events"
+          ]
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+        "name": "flux-rbac-reader"
+      },
+      "rules": [
+        {
+          "verbs": [
+            "get",
+            "list",
+            "watch"
+          ],
+          "apiGroups": [
+            "rbac.authorization.k8s.io"
+          ],
+          "resources": [
+            "clusterroles",
+            "roles",
+            "clusterrolebindings",
+            "rolebindings"
+          ]
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+        "name": "metrics-reader"
+      },
+      "rules": [
+        {
+          "verbs": [
+            "get",
+            "list",
+            "watch"
+          ],
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "pods",
+            "nodes"
+          ]
+        },
+        {
+          "verbs": [
+            "get"
+          ],
+          "nonResourceURLs": [
+            "/metrics"
+          ]
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+        "name": "secret-syncer"
+      },
+      "rules": [
+        {
+          "verbs": [
+            "get",
+            "list",
+            "watch"
+          ],
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "secrets",
+            "configmaps"
+          ]
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+        "name": "tenant-admin"
+      },
+      "rules": [],
+      "aggregationRule": {
+        "clusterRoleSelectors": [
+          {
+            "matchLabels": {
+              "rbac.example.com/aggregate-to-tenant-admin": "true"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+        "name": "mesh-sidecar-reader",
+        "labels": {
+          "rbac.example.com/aggregate-to-tenant-admin": "true"
+        }
+      },
+      "rules": [
+        {
+          "verbs": [
+            "get",
+            "list",
+            "watch"
+          ],
+          "apiGroups": [
+            "admissionregistration.k8s.io"
+          ],
+          "resources": [
+            "mutatingwebhookconfigurations"
+          ]
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+        "name": "node-reader"
+      },
+      "rules": [
+        {
+          "verbs": [
+            "get",
+            "list",
+            "watch"
+          ],
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "nodes"
+          ]
+        },
+        {
+          "verbs": [
+            "get"
+          ],
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "nodes/metrics",
+            "nodes/stats"
+          ]
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+        "name": "policy-reader"
+      },
+      "rules": [
+        {
+          "verbs": [
+            "get",
+            "list",
+            "watch"
+          ],
+          "apiGroups": [
+            "rbac.authorization.k8s.io"
+          ],
+          "resources": [
+            "clusterroles"
+          ]
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRole",
+      "metadata": {
+        "name": "support-impersonator"
+      },
+      "rules": [
+        {
+          "verbs": [
+            "impersonate"
+          ],
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "users"
+          ],
+          "resourceNames": [
+            "support-readonly"
+          ]
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "Role",
+      "metadata": {
+        "name": "build-runner",
+        "namespace": "ci"
+      },
+      "rules": [
+        {
+          "verbs": [
+            "get",
+            "list",
+            "watch"
+          ],
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "pods"
+          ]
+        },
+        {
+          "verbs": [
+            "get"
+          ],
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "pods/log"
+          ]
+        },
+        {
+          "verbs": [
+            "get",
+            "list",
+            "watch"
+          ],
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "configmaps"
+          ]
+        },
+        {
+          "verbs": [
+            "get"
+          ],
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "secrets"
+          ],
+          "resourceNames": [
+            "build-cache-config"
+          ]
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "Role",
+      "metadata": {
+        "name": "report-reader",
+        "namespace": "legacy"
+      },
+      "rules": [
+        {
+          "verbs": [
+            "get",
+            "list"
+          ],
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "secrets",
+            "configmaps"
+          ]
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "metadata": {
+        "name": "cluster-admin"
+      },
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "cluster-admin"
+      },
+      "subjects": [
+        {
+          "kind": "User",
+          "name": "cluster-operator",
+          "apiGroup": "rbac.authorization.k8s.io"
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "metadata": {
+        "name": "platform-flux"
+      },
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "flux-rbac-reader"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "flux-reconciler",
+          "namespace": "platform"
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "metadata": {
+        "name": "metrics-reader-all"
+      },
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "metrics-reader"
+      },
+      "subjects": [
+        {
+          "kind": "Group",
+          "name": "system:authenticated",
+          "apiGroup": "rbac.authorization.k8s.io"
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "metadata": {
+        "name": "tenant-admin-ci"
+      },
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "tenant-admin"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "buildkit",
+          "namespace": "ci"
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "metadata": {
+        "name": "node-reader"
+      },
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "node-reader"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "node-agent",
+          "namespace": "kube-system"
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "metadata": {
+        "name": "policy-reader"
+      },
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "policy-reader"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "policy-composer",
+          "namespace": "platform"
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "metadata": {
+        "name": "support-impersonator"
+      },
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "support-impersonator"
+      },
+      "subjects": [
+        {
+          "kind": "User",
+          "name": "support-engineer",
+          "apiGroup": "rbac.authorization.k8s.io"
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+        "name": "observability-secret-sync",
+        "namespace": "observability"
+      },
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "secret-syncer"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "metrics-collector",
+          "namespace": "observability"
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+        "name": "ci-reads-platform",
+        "namespace": "platform"
+      },
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "workload-viewer"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "pipeline-runner",
+          "namespace": "ci"
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+        "name": "build-runner",
+        "namespace": "ci"
+      },
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "Role",
+        "name": "build-runner"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "pipeline-runner",
+          "namespace": "ci"
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+        "name": "report-reader",
+        "namespace": "legacy"
+      },
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "Role",
+        "name": "report-reader"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "report-exporter",
+          "namespace": "legacy"
+        }
+      ]
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "default",
+        "namespace": "ci"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "pipeline-runner",
+        "namespace": "ci"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "buildkit",
+        "namespace": "ci"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "default",
+        "namespace": "platform"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "flux-reconciler",
+        "namespace": "platform"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "policy-composer",
+        "namespace": "platform"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "default",
+        "namespace": "observability"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "metrics-collector",
+        "namespace": "observability"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "default",
+        "namespace": "legacy"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "report-exporter",
+        "namespace": "legacy"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "default",
+        "namespace": "kube-system"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "node-agent",
+        "namespace": "kube-system"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "coredns",
+        "namespace": "kube-system"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "build-cache-config",
+        "namespace": "ci"
+      },
+      "type": "Opaque",
+      "data": {
+        "value": "UkVEQUNURUQtVEVTVC1WQUxVRQ=="
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "flux-git-credentials",
+        "namespace": "platform"
+      },
+      "type": "Opaque",
+      "data": {
+        "value": "UkVEQUNURUQtVEVTVC1WQUxVRQ=="
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "report-exporter-token-x9q2w",
+        "namespace": "legacy",
+        "annotations": {
+          "kubernetes.io/service-account.name": "report-exporter"
+        }
+      },
+      "type": "kubernetes.io/service-account-token",
+      "data": {
+        "token": "UkVEQUNURUQtVEVTVC1WQUxVRQ=="
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "name": "builder-7f9c4d",
+        "namespace": "ci",
+        "labels": {
+          "app": "buildkit"
+        }
+      },
+      "spec": {
+        "serviceAccountName": "buildkit",
+        "nodeName": "worker-1",
+        "containers": [
+          {
+            "name": "app",
+            "image": "registry.example/buildkit:0.14.1"
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "name": "flux-controller-5d8b6f",
+        "namespace": "platform",
+        "labels": {
+          "app": "flux-controller"
+        }
+      },
+      "spec": {
+        "serviceAccountName": "flux-reconciler",
+        "nodeName": "worker-2",
+        "containers": [
+          {
+            "name": "app",
+            "image": "registry.example/flux:2.3.0"
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "name": "metrics-collector-2kkzp",
+        "namespace": "observability",
+        "labels": {
+          "app": "metrics-collector"
+        }
+      },
+      "spec": {
+        "serviceAccountName": "metrics-collector",
+        "nodeName": "worker-1",
+        "containers": [
+          {
+            "name": "app",
+            "image": "registry.example/metrics:1.9.0"
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "name": "report-exporter-0",
+        "namespace": "legacy",
+        "labels": {
+          "app": "report-exporter"
+        }
+      },
+      "spec": {
+        "serviceAccountName": "report-exporter",
+        "nodeName": "worker-2",
+        "containers": [
+          {
+            "name": "app",
+            "image": "registry.example/reporter:0.3.9"
+          }
+        ],
+        "nodeSelector": {
+          "disktype": "ssd"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "name": "kube-apiserver-cp-1",
+        "namespace": "kube-system",
+        "labels": {
+          "component": "kube-apiserver",
+          "tier": "control-plane"
+        }
+      },
+      "spec": {
+        "serviceAccountName": "default",
+        "nodeName": "cp-1",
+        "containers": [
+          {
+            "name": "app",
+            "image": "registry.example/kube-apiserver:v1.31.4"
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "name": "coredns-6c8d5f7b99-q4lxn",
+        "namespace": "kube-system",
+        "labels": {
+          "k8s-app": "kube-dns"
+        }
+      },
+      "spec": {
+        "serviceAccountName": "coredns",
+        "nodeName": "worker-1",
+        "containers": [
+          {
+            "name": "app",
+            "image": "registry.example/coredns:1.11.3"
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Pod",
+      "metadata": {
+        "name": "node-agent-sl2qd",
+        "namespace": "kube-system",
+        "labels": {
+          "app": "node-agent"
+        }
+      },
+      "spec": {
+        "serviceAccountName": "node-agent",
+        "nodeName": "worker-1",
+        "containers": [
+          {
+            "name": "app",
+            "image": "registry.example/node-agent:2.1.0"
+          }
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "resourceVersion": ""
+  }
+}
