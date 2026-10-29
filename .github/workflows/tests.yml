@@ -1,0 +1,166 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: tests (python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      # The whole suite is offline: every assertion is a pure function over
+      # JSON that is already in the repository, so there is no cluster to
+      # start and nothing to wait for.
+      - name: Tests
+        run: python -m unittest discover -s tests -t . -v
+
+  cli:
+    name: cli contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Install graphviz
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends graphviz
+
+      - name: Help and metadata
+        run: |
+          rbac-paths --help
+          rbac-paths --version
+          rbac-paths --list-rules
+          rbac-paths --explain RBAC-011
+
+      - name: The vulnerable example yields the documented paths
+        run: |
+          set -euo pipefail
+          # --exit-zero because finding a path is exit 1 by design, and this
+          # step asserts on the content rather than on the code.
+          rbac-paths escalate --dump examples/cluster-vulnerable.json \
+            --from sa:ci:pipeline-runner --format json --max-paths 50 --exit-zero > vuln.json
+          python - <<'PY'
+          import json
+          with open("vuln.json", encoding="utf-8") as handle:
+              payload = json.load(handle)
+          chains = {tuple(e["ruleId"] for e in p["edges"]) for p in payload["paths"]}
+          assert payload["pathCount"] > 1, payload["pathCount"]
+          assert payload["paths"][0]["length"] == 2, payload["paths"][0]["length"]
+          for expected in (
+              ("RBAC-011", "RBAC-003"),
+              ("RBAC-009", "RBAC-021"),
+              ("RBAC-007", "RBAC-006"),
+          ):
+              assert expected in chains, (expected, sorted(chains))
+          print(f"{payload['pathCount']} paths, shortest {payload['paths'][0]['length']} hops")
+          PY
+
+      - name: The hardened example yields no path for the same subject
+        run: |
+          set -euo pipefail
+          rbac-paths escalate --dump examples/cluster-hardened.json \
+            --from sa:ci:pipeline-runner --format json > hard.json
+          python -c "import json; p=json.load(open('hard.json')); assert p['pathCount']==0, p"
+
+      - name: who-can honours resourceNames
+        run: |
+          set -euo pipefail
+          # The CI runner's Secret read is pinned to one object, so it must not
+          # appear in the unrestricted answer but must appear in the named one.
+          rbac-paths who-can --dump examples/cluster-vulnerable.json get secrets \
+            | tee unrestricted.txt
+          ! grep -q "ci/pipeline-runner" unrestricted.txt
+          rbac-paths who-can --dump examples/cluster-vulnerable.json get secrets \
+            --name build-cache-config | grep -q "ci/pipeline-runner"
+
+      - name: DOT output parses with graphviz
+        run: |
+          set -euo pipefail
+          rbac-paths escalate --dump examples/cluster-vulnerable.json \
+            --from sa:ci:pipeline-runner --format dot --exit-zero > escalation.dot
+          dot -Tsvg escalation.dot -o escalation.svg
+          rbac-paths audit --dump examples/cluster-vulnerable.json --format dot \
+            --exit-zero > cluster.dot
+          dot -Tsvg cluster.dot -o cluster.svg
+          # An empty result must still be a valid graph.
+          rbac-paths escalate --dump examples/cluster-hardened.json \
+            --from sa:ci:pipeline-runner --format dot > empty.dot
+          dot -Tsvg empty.dot -o empty.svg
+
+      - name: JSON output parses
+        run: |
+          set -euo pipefail
+          rbac-paths audit --dump examples/cluster-vulnerable.json --format json \
+            --exit-zero | python -c "import json,sys; json.load(sys.stdin)"
+          rbac-paths who-can --dump examples/cluster-vulnerable.json create pods/exec \
+            --format json | python -c "import json,sys; json.load(sys.stdin)"
+          rbac-paths rules --format json | python -c "import json,sys; json.load(sys.stdin)"
+
+      - name: Exit codes are as documented
+        run: |
+          set -uo pipefail
+          expect() {
+            local want="$1"; shift
+            set +e
+            "$@" > /dev/null 2>&1
+            local got=$?
+            set -e
+            if [ "$got" != "$want" ]; then
+              echo "expected exit $want, got $got from: $*" >&2
+              exit 1
+            fi
+          }
+          # 1 = findings, 0 = clean
+          expect 1 rbac-paths escalate --dump examples/cluster-vulnerable.json --from sa:ci:pipeline-runner
+          expect 0 rbac-paths escalate --dump examples/cluster-hardened.json --from sa:ci:pipeline-runner
+          expect 0 rbac-paths escalate --dump examples/cluster-vulnerable.json --from sa:ci:pipeline-runner --exit-zero
+          expect 1 rbac-paths audit --dump examples/cluster-vulnerable.json
+          # 0 = who-can is a query, not a gate
+          expect 0 rbac-paths who-can --dump examples/cluster-vulnerable.json get secrets
+          expect 0 rbac-paths who-can --dump examples/cluster-hardened.json delete nodes
+          # 2 = usage
+          expect 2 rbac-paths escalate --dump examples/cluster-vulnerable.json --from runner
+          expect 2 rbac-paths --explain RBAC-999
+          expect 2 rbac-paths
+          # 3 = input
+          expect 3 rbac-paths audit --dump examples/not-a-file.json
+          echo "all exit codes as documented"
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install ruff==0.15.15
+      - run: ruff check src tests
