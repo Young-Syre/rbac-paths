@@ -29,7 +29,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 
 from .matching import split_resource
-from .model import ALL, PSA_LEVELS, Cluster, Subject
+from .model import ALL, PSA_LEVELS, Cluster, RoleRef, Subject
 from .resolver import Grant, Reach, Resolver, render_rule
 from .rules import get_rule, severity_rank
 
@@ -400,9 +400,14 @@ class Analysis:
 
     # RBAC-002 ---------------------------------------------------------------
 
-    def _writable_bound_roles(self, subject: Subject) -> list[tuple[str, Grant]]:
-        """Roles already bound to the subject that the subject can rewrite."""
-        out: list[tuple[str, Grant]] = []
+    def _writable_bound_roles(self, subject: Subject) -> list[tuple[RoleRef, Grant]]:
+        """Roles already bound to the subject that the subject can rewrite.
+
+        The ref is returned rather than its rendering, because the caller has
+        to match the role's own name against an escalate grant's
+        ``resourceNames``. Use ``str(ref)`` for display.
+        """
+        out: list[tuple[RoleRef, Grant]] = []
         seen: set[str] = set()
         bound = {grant.role for grant in self.resolver.grants(subject, self.extra_groups)}
         for ref in sorted(bound, key=str):
@@ -416,9 +421,43 @@ class Analysis:
                 )
                 if grants and str(ref) not in seen:
                     seen.add(str(ref))
-                    out.append((str(ref), grants[0]))
+                    out.append((ref, grants[0]))
                     break
         return out
+
+    @staticmethod
+    def _names_covered(grants: Sequence[Grant]) -> set[str] | None:
+        """The resource names a set of grants covers, or None for all of them.
+
+        A rule with no ``resourceNames`` covers every object of its resource,
+        so one such grant makes the whole set unrestricted.
+        """
+        names: set[str] = set()
+        for grant in grants:
+            if not grant.rule.resource_names:
+                return None
+            names.update(grant.rule.resource_names)
+        return names
+
+    def _escalation_targets(
+        self,
+        writable: Sequence[tuple[RoleRef, Grant]],
+        escalate_grants: Sequence[Grant],
+    ) -> list[tuple[RoleRef, Grant]]:
+        """The roles an ``escalate`` grant actually lets the subject rewrite.
+
+        The attack needs ``escalate`` **and** write access on the *same* role:
+        escalate lifts the restriction that you may not grant permissions you
+        do not hold, and writing the role is how you grant them. The two sets
+        used to be resolved independently and the first writable role reported,
+        so a subject with ``escalate`` on ``role-a`` and ``update`` on
+        ``role-b`` -- both bound to it -- was reported as a critical path to
+        cluster-admin that does not exist.
+        """
+        covered = self._names_covered(escalate_grants)
+        if covered is None:
+            return list(writable)
+        return [(ref, grant) for ref, grant in writable if ref.name in covered]
 
     def _detect_escalate(self, node: str, subject: Subject) -> list[Edge]:
         edges: list[Edge] = []
@@ -428,8 +467,12 @@ class Analysis:
         )
         if cluster_reach.cluster_wide:
             grant = cluster_reach.cluster_wide[0]
-            if writable:
-                role_name, _ = writable[0]
+            cluster_writable = [
+                (ref, g) for ref, g in writable if ref.kind == "ClusterRole"
+            ]
+            targets = self._escalation_targets(cluster_writable, cluster_reach.cluster_wide)
+            if targets:
+                role_name = str(targets[0][0])
                 edges.append(
                     self._edge(
                         "RBAC-002",
@@ -457,8 +500,9 @@ class Analysis:
                     None,
                     (
                         "holds `escalate` on clusterroles but cannot write any role "
-                        "that is already bound to it, so the verb is inert until it "
-                        "also gains role write access or a way to create a binding"
+                        "that is already bound to it and that the escalate grant "
+                        "covers, so the verb is inert until it also gains role write "
+                        "access or a way to create a binding"
                     ),
                     grant,
                     severity="medium",
@@ -468,9 +512,14 @@ class Analysis:
             grants = ns_reach.grants_in(namespace)
             if not grants:
                 continue
-            writable_ns = [
-                (name, g) for name, g in writable if name.startswith(f"Role {namespace}/")
-            ]
+            writable_ns = self._escalation_targets(
+                [
+                    (ref, g)
+                    for ref, g in writable
+                    if ref.kind == "Role" and ref.namespace == namespace
+                ],
+                grants,
+            )
             if writable_ns:
                 edges.append(
                     self._edge(
@@ -496,7 +545,8 @@ class Analysis:
                     namespace,
                     (
                         f"holds `escalate` on roles in namespace {namespace} but cannot "
-                        "write a role already bound to it, so the verb is inert on its own"
+                        "write a role already bound to it that the escalate grant "
+                        "covers, so the verb is inert on its own"
                     ),
                     grants[0],
                     severity="medium",

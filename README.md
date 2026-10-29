@@ -291,7 +291,7 @@ radius or is a precondition; **low**, worth knowing, not an escalation.
 | ID | Primitive | Severity | Mechanism |
 |----|-----------|----------|-----------|
 | RBAC-001 | `*` verbs on `*` resources, cluster-wide | critical | The first rule of `cluster-admin`. Nothing needs chaining. |
-| RBAC-002 | `escalate` on roles/clusterroles | critical | Switches off permission containment for role writes. Reported as an edge only when the subject can also *write* a role already bound to it, since otherwise the new rules reach nobody; otherwise reported as an inert note. |
+| RBAC-002 | `escalate` on roles/clusterroles | critical | Switches off permission containment for role writes. Reported as an edge only when the subject can also *write* a role already bound to it **and** the `escalate` grant's `resourceNames` cover that same role — the attack needs both verbs on one object, since escalate lifts the containment and the write is how the permissions are granted. Otherwise reported as an inert note. |
 | RBAC-003 | `bind` on roles/clusterroles | critical | Switches off containment for binding creation. Reported as an edge only when the subject can also create the binding and a wildcard ClusterRole exists to bind. |
 | RBAC-004 | `impersonate` on `groups` | critical | `system:masters` is allowed unconditionally, ahead of authorisation, and no RBAC object names it. |
 | RBAC-005 | `impersonate` on `users`/`serviceaccounts` | high | Reaches whatever the impersonated identity holds, with no token theft. |
@@ -469,7 +469,7 @@ in them came from any real cluster.
 ```
 $ python -m unittest discover -s tests -t . -v
 ...
-Ran 444 tests in 0.222s
+Ran 447 tests in 0.222s
 
 OK
 ```

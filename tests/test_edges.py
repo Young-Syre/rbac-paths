@@ -129,6 +129,70 @@ class Rbac002EscalateTests(unittest.TestCase):
         self.assertIn("RBAC-002", note_ids(analysis))
         self.assertTrue(any("inert" in n.detail for n in analysis.notes))
 
+    def test_escalate_restricted_to_another_role_is_not_a_path(self):
+        """The attack needs both verbs on the *same* role.
+
+        `escalate` lifts the restriction that you may not grant permissions you
+        do not hold; writing the role is how you grant them. The two sets were
+        resolved independently and the first writable role reported, so a
+        subject holding `escalate` on one bound role and `update` on a
+        different bound role was reported as a critical path to cluster-admin
+        that does not exist.
+        """
+        items = [
+            fx.cluster_role("role-a", [fx.rule(["get"], [""], ["pods"])]),
+            fx.cluster_role("role-b", [fx.rule(["get"], [""], ["pods"])]),
+            fx.cluster_role(
+                "composer",
+                [
+                    fx.rule(["escalate"], [RBAC], ["clusterroles"], resource_names=["role-a"]),
+                    fx.rule(["update"], [RBAC], ["clusterroles"], resource_names=["role-b"]),
+                ],
+            ),
+            fx.cluster_role_binding("composer-crb", "composer", [fx.sa_subject("ci", "runner")]),
+            fx.cluster_role_binding("a-crb", "role-a", [fx.sa_subject("ci", "runner")]),
+            fx.cluster_role_binding("b-crb", "role-b", [fx.sa_subject("ci", "runner")]),
+            fx.service_account("ci", "runner"),
+        ]
+        analysis = analyse(items)
+        self.assertNotIn("RBAC-002", ids(analysis, RUNNER))
+        self.assertIn("RBAC-002", note_ids(analysis))
+        self.assertTrue(any("escalate grant covers" in n.detail for n in analysis.notes))
+
+    def test_escalate_and_write_on_the_same_named_role_is_a_path(self):
+        items = [
+            fx.cluster_role("role-a", [fx.rule(["get"], [""], ["pods"])]),
+            fx.cluster_role(
+                "composer",
+                [
+                    fx.rule(
+                        ["escalate", "update"], [RBAC], ["clusterroles"], resource_names=["role-a"]
+                    )
+                ],
+            ),
+            fx.cluster_role_binding("composer-crb", "composer", [fx.sa_subject("ci", "runner")]),
+            fx.cluster_role_binding("a-crb", "role-a", [fx.sa_subject("ci", "runner")]),
+            fx.service_account("ci", "runner"),
+        ]
+        self.assertIn(GOAL, targets(analyse(items), RUNNER, "RBAC-002"))
+
+    def test_unrestricted_escalate_covers_any_writable_bound_role(self):
+        """A rule with no resourceNames covers every object of its resource."""
+        items = [
+            fx.cluster_role("role-b", [fx.rule(["get"], [""], ["pods"])]),
+            fx.cluster_role(
+                "composer",
+                [
+                    fx.rule(["escalate"], [RBAC], ["clusterroles"]),
+                    fx.rule(["update"], [RBAC], ["clusterroles"], resource_names=["role-b"]),
+                ],
+            ),
+            fx.cluster_role_binding("composer-crb", "composer", [fx.sa_subject("ci", "runner")]),
+            fx.cluster_role_binding("b-crb", "role-b", [fx.sa_subject("ci", "runner")]),
+            fx.service_account("ci", "runner"),
+        ]
+        self.assertIn(GOAL, targets(analyse(items), RUNNER, "RBAC-002"))
+
     def test_escalate_on_namespaced_roles_reaches_namespace_admin(self):
         analysis = analyse(
             bind_role(
