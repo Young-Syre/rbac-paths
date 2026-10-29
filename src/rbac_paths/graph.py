@@ -35,6 +35,11 @@ from .rules import get_rule, severity_rank
 
 GOAL = "cluster-admin"
 
+#: Label for the last hop into a ``--to <verb>:<resource>`` target.  Not a rule
+#: id: holding the permission you asked about is the end of the search rather
+#: than a primitive, so there is nothing to explain or remediate.
+TARGET_EDGE = "TARGET"
+
 RBAC_GROUP = "rbac.authorization.k8s.io"
 CERTS_GROUP = "certificates.k8s.io"
 ADMISSION_GROUP = "admissionregistration.k8s.io"
@@ -1440,7 +1445,13 @@ class Analysis:
     # -- targets -------------------------------------------------------------
 
     def permission_edges(self, node: str, target: str) -> list[Edge]:
-        """Edges into a ``perm:`` target, for ``--to <verb>:<resource>``."""
+        """Edges into a ``perm:`` target, for ``--to <verb>:<resource>``.
+
+        These carry :data:`TARGET_EDGE` rather than a rule id: holding the
+        permission the caller asked about is the end of the search, not an
+        escalation primitive, so it has no mechanism to explain and no
+        remediation to offer.
+        """
         if not target.startswith("perm:"):
             return []
         _, verb, api_group, resource = target.split(":", 3)
@@ -1454,7 +1465,7 @@ class Analysis:
         for grant in reach.cluster_wide:
             edges.append(
                 self._edge(
-                    "RBAC-000",
+                    TARGET_EDGE,
                     node,
                     target,
                     None,
@@ -1468,7 +1479,7 @@ class Analysis:
         for ns in sorted(reach.by_namespace):
             edges.append(
                 self._edge(
-                    "RBAC-000",
+                    TARGET_EDGE,
                     node,
                     target,
                     ns,

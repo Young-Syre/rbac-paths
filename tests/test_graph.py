@@ -7,6 +7,7 @@ import unittest
 import fixtures as fx
 from rbac_paths.graph import (
     GOAL,
+    TARGET_EDGE,
     Analysis,
     collect_all_edges,
     find_paths,
@@ -243,6 +244,16 @@ class PermissionTargetTests(unittest.TestCase):
         self.assertEqual(
             find_paths(analyse(items), "sa:ci:runner", parse_target("get:secrets")), []
         )
+
+    def test_the_final_hop_is_not_labelled_as_a_rule(self):
+        items = [
+            fx.cluster_role("reader", [fx.rule(["get"], [""], ["secrets"])]),
+            fx.cluster_role_binding("crb", "reader", [fx.sa_subject("ci", "runner")]),
+            fx.service_account("ci", "runner"),
+        ]
+        paths = find_paths(analyse(items), "sa:ci:runner", parse_target("get:secrets"))
+        self.assertEqual(paths[0].edges[-1].rule_id, TARGET_EDGE)
+        self.assertNotIn("RBAC", TARGET_EDGE)
 
     def test_a_group_qualified_permission_target(self):
         items = [

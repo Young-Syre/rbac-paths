@@ -143,7 +143,10 @@ This is a statement about the rules in the dump, not about the cluster: a path t
 ```
 
 `--to` takes a narrower target than cluster-admin:
-`rbac-paths escalate --dump cluster.json --from sa:ci:pipeline-runner --to get:secrets`.
+`rbac-paths escalate --dump cluster.json --from sa:ci:pipeline-runner --to
+get:secrets`. The last hop of such a path is labelled `TARGET` rather than a
+rule id, because holding the permission you asked about is the end of the
+search rather than an escalation primitive.
 
 ### Who can do a thing
 
@@ -466,7 +469,7 @@ in them came from any real cluster.
 ```
 $ python -m unittest discover -s tests -t . -v
 ...
-Ran 443 tests in 0.220s
+Ran 444 tests in 0.222s
 
 OK
 ```
