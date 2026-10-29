@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Environments
+.venv/
+venv/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local
+*.log
+.env
+.DS_Store
+
+# A cluster dump from a real cluster must never be committed. The examples
+# directory holds the fabricated ones, which are tracked.
+cluster*.local.json
+*.dump.json
+
+# Artefacts from rehearsing the CI steps locally.
+vuln.json
+hard.json
+unrestricted.txt
+escalation.dot
+escalation.svg
+cluster.dot
+cluster.svg
+empty.dot
+empty.svg
