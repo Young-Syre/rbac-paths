@@ -13,7 +13,7 @@ with the rule that permits each hop and the action a tester would take.
 It never contacts an API server. There is no Kubernetes client in the
 dependency tree, because there are no dependencies at all.
 
-## Why this bug class exists
+## RBAC is additive, and there is no deny
 
 Kubernetes RBAC has two properties that together make it hard to reason about.
 
